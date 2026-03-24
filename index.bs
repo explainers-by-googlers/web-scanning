@@ -1,17 +1,17 @@
 <pre class='metadata'>
-Title: The TODO API
-Shortname: todo
+Title: Web Scanning API
+Shortname: web-scanning
 Level: None
 Status: w3c/UD
-Repository: explainers-by-googlers/todo-your-repo-name
-URL: https://explainers-by-googlers.github.io/todo-your-repo-name
-Editor: TODO: Your Name, Google https://google.com, TODO@google.com
-Abstract: TODO: A short description of your spec, one or two sentences.
+Repository: explainers-by-googlers/web-scanning
+URL: https://explainers-by-googlers.github.io/web-scanning
+Editor: Zgroza Klimek, Google https://google.com, zgroza@google.com
+Abstract: This specification defines a web-native API for document scanning, allowing web applications to securely interact with attached or networked scanning hardware.
 Markup Shorthands: markdown yes, css no
 Complain About: accidental-2119 yes, missing-example-ids yes
 Assume Explicit For: yes
 Die On: warning
-WPT Path Prefix: TODO-API-LABEL
+WPT Path Prefix: web-scanning
 WPT Display: closed
 Include MDN Panels: if possible
 Include Can I Use Panels: yes
@@ -20,7 +20,7 @@ Include Can I Use Panels: yes
 Introduction {#intro}
 =====================
 
-For now, see the <a href=[REPOSITORYURL]>explainer</a>.
+For now, see the <a href="https://github.com/explainers-by-googlers/web-scanning">explainer</a>.
 
 See [https://garykac.github.io/procspec/](https://garykac.github.io/procspec/),
 [https://dlaliberte.github.io/bikeshed-intro/index.html](https://dlaliberte.github.io/bikeshed-intro/index.html),

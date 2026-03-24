@@ -1,185 +1,207 @@
-# Explainer for the TODO API
+# Explainer for the Web Scanning API
 
-**Instructions for the explainer author: Search for "todo" in this repository and update all the
-instances as appropriate. For the instances in `index.bs`, update the repository name, but you can
-leave the rest until you start the specification. Then delete the TODOs and this block of text.**
-
-This proposal is an early design sketch by [TODO: team] to describe the problem below and solicit
-feedback on the proposed solution. It has not been approved to ship in Chrome.
-
-TODO: Fill in the whole explainer template below using https://tag.w3.org/explainers/ as a
-reference. Look for [brackets].
+This proposal is an early design sketch by the ChromeOS team to describe the problem of document scanning on the web and solicit feedback on the proposed solution. It has not been approved to ship in Chrome.
 
 ## Proponents
 
-- [Proponent team 1]
-- [Proponent team 2]
-- [etc.]
+- Google Chrome
 
 ## Participate
-- https://github.com/explainers-by-googlers/[your-repository-name]/issues
-- [Discussion forum]
+- https://github.com/explainers-by-googlers/web-scanning/issues
 
-## Table of Contents [if the explainer is longer than one printed page]
+## Table of Contents
 
 <!-- Update this table of contents by running `npx doctoc README.md` -->
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Introduction](#introduction)
+- [Terminology](#terminology)
 - [Goals](#goals)
 - [Non-goals](#non-goals)
-- [User research](#user-research)
 - [Use cases](#use-cases)
-  - [Use case 1](#use-case-1)
-  - [Use case 2](#use-case-2)
-- [[Potential Solution]](#potential-solution)
+  - [Single-page flatbed scanning](#single-page-flatbed-scanning)
+  - [High-volume batch scanning (ADF)](#high-volume-batch-scanning-adf)
+  - [Progressive image display](#progressive-image-display)
+- [Potential Solution](#potential-solution)
+  - [The `ScannerManager` Interface](#the-scannermanager-interface)
+  - [The `Scanner` Interface](#the-scanner-interface)
+  - [The `ScanJob` Interface](#the-scanjob-interface)
   - [How this solution would solve the use cases](#how-this-solution-would-solve-the-use-cases)
-    - [Use case 1](#use-case-1-1)
-    - [Use case 2](#use-case-2-1)
+    - [Basic Scan](#basic-scan)
+    - [Batch Scan with ADF (Streaming)](#batch-scan-with-adf-streaming)
 - [Detailed design discussion](#detailed-design-discussion)
-  - [[Tricky design choice #1]](#tricky-design-choice-1)
-  - [[Tricky design choice 2]](#tricky-design-choice-2)
+  - [User-Mediated Device Selection (The Chooser Pattern)](#user-mediated-device-selection-the-chooser-pattern)
+  - [Streaming vs. Atomic Results](#streaming-vs-atomic-results)
+  - [Normalized Coordinate Geometry](#normalized-coordinate-geometry)
 - [Considered alternatives](#considered-alternatives)
-  - [[Alternative 1]](#alternative-1)
-  - [[Alternative 2]](#alternative-2)
+  - [Direct Hardware Access (WebUSB/WebBluetooth)](#direct-hardware-access-webusbwebbluetooth)
+  - [Extension-based APIs](#extension-based-apis)
 - [Security and Privacy Considerations](#security-and-privacy-considerations)
 - [Stakeholder Feedback / Opposition](#stakeholder-feedback--opposition)
-- [References & acknowledgements](#references--acknowledgements)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Introduction
 
-[The "executive summary" or "abstract".
-Explain in a few sentences what the goals of the project are,
-and a brief overview of how the solution works.
-This should be no more than 1-2 paragraphs.]
+Web applications requiring document scanning currently rely on fragmented, non-standard approaches, such as proprietary browser extensions or legacy app models (e.g., Chrome Apps using the [`chrome.documentScan`](https://developer.chrome.com/docs/extensions/reference/api/documentScan) API). These legacy models tightly couple web applications to specific browser ecosystems or require users to install heavy, OS-specific native companion applications. These methods severely limit cross-browser compatibility, create maintenance burdens for developers, and pose security risks as browser vendors transition away from extension-bound hardware access (such as the shift to Manifest V3).
+
+The Web Scanning API provides a standardized, secure, and web-native interface for document scanning. It abstracts underlying, highly varied hardware protocols into a cohesive API. These protocols include:
+- **TWAIN / TWAIN Direct:** A legacy driver-based standard and its modern RESTful network successor.
+- **eSCL (AirScan):** A driverless, network-based scanning protocol developed by the Mopria Alliance.
+- **SANE (Scanner Access Now Easy):** A standardized API predominantly used in UNIX/Linux environments.
+- **WSD (Web Services for Devices):** Microsoft's native architecture for network-connected devices.
+
+By abstracting these protocols, the API ensures that web applications can interact with scanning hardware through a uniform, user-mediated permission model without needing to understand the underlying transport.
+
+## Terminology
+
+To help developers without background in imaging hardware, we define the following terms:
+- **Platen (Flatbed):** The glass surface where a document is placed manually. Best for single pages or fragile documents.
+- **ADF (Automatic Document Feeder):** A component that automatically pulls a stack of paper into the scanner. Essential for high-volume batch scanning.
+- **Duplex Scanning:** The ability to scan both sides of a piece of paper automatically.
+- **Resolution (DPI):** Measured in Dots Per Inch. Higher DPI means more detail but larger file sizes and slower scan speeds.
+- **Color Mode:** Options typically include `color` (24-bit), `grayscale` (8-bit), and `monochrome` (1-bit black and white).
+- **Paper Jam:** A mechanical error where paper becomes stuck inside the ADF mechanism.
 
 ## Goals
 
-[What is the **end-user need** which this project aims to address? Make this section short, and
-elaborate in the Use cases section.]
+- **Standardization:** Provide a unified API for document scanning agnostic of the underlying platform.
+- **Hardware Abstraction:** Hide the complexity of various scanning protocols (TWAIN, eSCL, etc.) behind a clean JavaScript interface.
+- **Security & Privacy:** Ensure hardware access is strictly controlled by the user through a permission-gated device picker, preventing silent surveillance or fingerprinting.
+- **Efficiency:** Use streaming to handle high-resolution or multi-page scans without exhausting system memory.
+- **Asynchronicity:** Handle mechanical hardware latency using Promises, events, and asynchronous iterables.
 
 ## Non-goals
 
-[If there are "adjacent" goals which may appear to be in scope but aren't,
-enumerate them here. This section may be fleshed out as your design progresses and you encounter necessary technical and other trade-offs.]
-
-## User research
-
-[If any user research has been conducted to inform your design choices,
-discuss the process and findings. User research should be more common than it is.]
+- **Low-level Driver Access:** The API is not intended to provide raw access to hardware registers or proprietary driver settings that are not relevant to standard scanning tasks.
+- **Direct Network Discovery:** Web pages will not be able to silently discover all scanners on a local network; this discovery is managed by the browser during the device selection process.
 
 ## Use cases
 
-[Describe in detail what problems end-users are facing, which this project is trying to solve. A
-common mistake in this section is to take a web developer's or server operator's perspective, which
-makes reviewers worry that the proposal will violate [RFC 8890, The Internet is for End
-Users](https://www.rfc-editor.org/rfc/rfc8890).]
+### Single-page flatbed scanning
+A user needs to scan a single document (e.g., a signed contract) from a flatbed scanner into a web-based document management system.
 
-### Use case 1
+### High-volume batch scanning (ADF)
+A user needs to scan a stack of documents using an Automatic Document Feeder (ADF), potentially with duplex (two-sided) scanning, into a medical or enterprise record system.
 
-### Use case 2
+### Progressive image display
+A user scans a high-resolution photo. To ensure the UI feels responsive, the application displays chunks of the image as they are received from the scanner, rather than waiting for the entire multi-megabyte file to finish.
 
-<!-- In your initial explainer, you shouldn't be attached or appear attached to any of the potential
-solutions you describe below this. -->
+## Potential Solution
 
-## [Potential Solution]
+The API is exposed via `navigator.scanners` and uses a pattern similar to WebUSB or WebHID, where a user-mediated chooser is the primary entry point for hardware access.
 
-[For each related element of the proposed solution - be it an additional JS method, a new object, a new element, a new concept etc., create a section which briefly describes it.]
+### The `ScannerManager` Interface
+The entry point for the API, used to request access to scanners.
 
 ```js
-// Provide example code - not IDL - demonstrating the design of the feature.
-
-// If this API can be used on its own to address a user need,
-// link it back to one of the scenarios in the goals section.
-
-// If you need to show how to get the feature set up
-// (initialized, or using permissions, etc.), include that too.
+// Triggers a browser-native device picker.
+const scanner = await navigator.scanners.requestScanner({
+  filters: [{ vendorId: '0x04a9' }] // Optional filtering
+});
 ```
 
-[Where necessary, provide links to longer explanations of the relevant pre-existing concepts and API.
-If there is no suitable external documentation, you might like to provide supplementary information as an appendix in this document, and provide an internal link where appropriate.]
+### The `Scanner` Interface
+Represents a specific scanning device authorized by the user. Identifiers are randomized and scoped to the origin.
 
-[If this is already specced, link to the relevant section of the spec.]
+```js
+const capabilities = await scanner.getCapabilities();
+console.log(`Available resolutions: ${capabilities.resolutions}`);
 
-[If spec work is in progress, link to the PR or draft of the spec.]
+const controller = new AbortController();
+const job = await scanner.scan({
+  resolution: 300,
+  colorMode: 'color',
+  source: 'adf',
+  signal: controller.signal
+});
+```
 
-[If you have more potential solutions in mind, add ## Potential Solution 2, 3, etc. sections.]
+### The `ScanJob` Interface
+Represents an ongoing scan operation. It implements `AsyncIterable` to yield pages as they complete.
+
+```js
+// The job provides streaming access to scanned pages.
+for await (const page of job) {
+  console.log(`Received page ${page.index}`);
+  const blob = await page.getBlob();
+  // page also provides a ReadableStream for chunked data
+  const stream = page.data; 
+}
+
+job.onpaperjam = () => {
+  console.error("The ADF is jammed. Please clear the paper path.");
+};
+```
 
 ### How this solution would solve the use cases
 
-[If there are a suite of interacting APIs, show how they work together to solve the use cases described.]
-
-#### Use case 1
-
-[Description of the end-user scenario]
-
+#### Basic Scan
 ```js
-// Sample code demonstrating how to use these APIs to address that scenario.
+async function performSimpleScan() {
+  const scanner = await navigator.scanners.requestScanner();
+  const job = await scanner.scan({ resolution: 300 });
+  
+  // For a simple scan, we just take the first result
+  const { value: firstPage } = await job[Symbol.asyncIterator]().next();
+  const blob = await firstPage.getBlob();
+  
+  const img = document.createElement('img');
+  img.src = URL.createObjectURL(blob);
+  document.body.appendChild(img);
+}
 ```
 
-#### Use case 2
-
-[etc.]
+#### Batch Scan with ADF (Streaming)
+```js
+async function performBatchScan() {
+  const scanner = await navigator.scanners.requestScanner();
+  const job = await scanner.scan({
+    source: 'adf',
+    duplex: true
+  });
+  
+  for await (const page of job) {
+    await uploadPage(await page.getBlob());
+    console.log(`Uploaded page ${page.index}`);
+  }
+  
+  console.log("All pages scanned and uploaded.");
+}
+```
 
 ## Detailed design discussion
 
-### [Tricky design choice #1]
+### User-Mediated Device Selection (The Chooser Pattern)
+To prevent fingerprinting and unauthorized hardware access, the API mandates a browser-native device chooser. Web applications cannot enumerate all connected scanners without an explicit user gesture. The `requestScanner()` method triggers this UI, and the resulting `Scanner` object represents a specific user-granted permission.
 
-[Talk through the tradeoffs in coming to the specific design point you want to make.]
+### Streaming vs. Atomic Results
+Scanning a single A4 page at 600 DPI can produce over 100MB of raw data. Returning this as a single atomic `Blob` can lead to out-of-memory crashes, especially on mobile devices or low-end hardware. The `ScanJob` interface uses `ReadableStream` and `AsyncIterable` to allow developers to process data as it arrives, enabling progressive rendering and efficient uploads.
 
-```js
-// Illustrated with example code.
-```
-
-[This may be an open question,
-in which case you should link to any active discussion threads.]
-
-### [Tricky design choice 2]
-
-[etc.]
+### Normalized Coordinate Geometry
+Different scanning protocols use different units (e.g., eSCL uses 1/300ths of an inch). The Web Scanning API normalizes all spatial dimensions to **millimeters** (physical) or **CSS pixels** (logical), ensuring a consistent developer experience across all hardware.
 
 ## Considered alternatives
 
-[This should include as many alternatives as you can,
-from high level architectural decisions down to alternative naming choices.]
+### Direct Hardware Access (WebUSB/WebBluetooth)
+While WebUSB/WebBluetooth provide low-level access, they require web developers to implement complex protocol drivers (e.g., TWAIN over USB) in JavaScript. This is extremely burdensome, prone to errors, and insecure as it exposes raw hardware buffers to the web page.
 
-### [Alternative 1]
-
-[Describe an alternative which was considered,
-and why you decided against it.]
-
-### [Alternative 2]
-
-[etc.]
+### Extension-based APIs
+Legacy APIs like `chrome.documentScan` are restricted to specific browser environments and extensions.
 
 ## Security and Privacy Considerations
 
-[Describe any interesting answers you give to the [Security and Privacy Self-Review
-Questionnaire](https://www.w3.org/TR/security-privacy-questionnaire/) and any interesting ways that
-your feature interacts with [Chromium's Web Platform Security
-Guidelines](https://chromium.googlesource.com/chromium/src/+/master/docs/security/web-platform-security-guidelines.md).]
+- **Secure Contexts:** The API is strictly limited to HTTPS origins.
+- **Permissions Policy:** Access is controlled by the `web-scanning` policy, defaulting to `self`.
+- **Randomized Identifiers:** Scanner IDs are randomized and origin-bound. `Scanner.id` on `example.com` will be different from the ID for the same device on `other-site.com`.
+- **Transient Activation:** Requests for hardware access (`requestScanner`) or starting a scan (`scan`) require a user gesture (e.g., a click).
+- **Visible Indicators:** Browsers should show a persistent "Scanning..." indicator while the hardware is active, similar to camera/microphone indicators.
 
 ## Stakeholder Feedback / Opposition
 
-[Implementors and other stakeholders may already have publicly stated positions on this work. If you can, list them here with links to evidence as appropriate.]
+- **Google (Chrome):** Positive, driving the proposal.
+- **TWAIN Working Group:** Potentially positive, as their TWAIN Direct standard is explicitly designed to enable scanners to communicate directly with web applications ([TWAIN Direct:™ Easy Scanning for Every Application](https://www.info-source.com/twain-direct-easy-scanning-for-every-application/)).
+- **Mopria Alliance (eSCL):** Potentially positive, as the proposed API leverages their vendor-neutral driverless standard ([Mopria eSCL Specification Download](https://mopria.org/spec-download)).
 
-- [Implementor A] : Positive
-- [Stakeholder B] : No signals
-- [Implementor C] : Negative
 
-[If appropriate, explain the reasons given by other implementors for their concerns.]
-
-## References & acknowledgements
-
-[Your design will change and be informed by many people; acknowledge them in an ongoing way! It helps build community and, as we only get by through the contributions of many, is only fair.]
-
-[Unless you have a specific reason not to, these should be in alphabetical order.]
-
-Many thanks for valuable feedback and advice from:
-
-- [Person 1]
-- [Person 2]
-- [etc.]
