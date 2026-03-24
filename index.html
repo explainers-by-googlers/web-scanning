@@ -2,13 +2,13 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>The TODO API</title>
+  <title>Web Scanning API</title>
   <meta content="UD" name="w3c-status">
   <link href="https://www.w3.org/StyleSheets/TR/2021/W3C-UD" rel="stylesheet">
-  <meta content="Bikeshed version 86e3be07a, updated Tue Nov 18 16:58:08 2025 +0000" name="generator">
-  <link href="https://explainers-by-googlers.github.io/todo-your-repo-name" rel="canonical">
+  <meta content="Bikeshed version 0ef803fdf, updated Tue Jan 6 11:59:39 2026 -0800" name="generator">
+  <link href="https://explainers-by-googlers.github.io/web-scanning" rel="canonical">
   <link href="https://www.w3.org/2008/site/images/favicon.ico" rel="icon">
-  <meta content="164ab860b554c955f818807b1b6c997fba5eb668" name="revision">
+  <meta content="6ed4b5697918133ea94cd4a345d95718ae65796a" name="revision">
   <meta content="dark light" name="color-scheme">
   <link href="https://www.w3.org/StyleSheets/TR/2021/dark.css" media="(prefers-color-scheme: dark)" rel="stylesheet" type="text/css">
 <style>/* Boilerplate: style-autolinks */
@@ -552,30 +552,30 @@ dd:not(:last-child) > .wpt-tests-block:not([open]):last-child {
     <img alt="W3C" height="48" src="https://www.w3.org/StyleSheets/TR/2021/logos/W3C" width="72">
 </a>
 </p>
-   <h1 class="no-ref p-name" id="title">The TODO API</h1>
+   <h1 class="no-ref p-name" id="title">Web Scanning API</h1>
    <p id="w3c-state"><a href="https://www.w3.org/standards/types/#UD">Unofficial Proposal Draft</a>,
-    <time class="dt-updated" datetime="2025-11-24">24 November 2025</time></p>
+    <time class="dt-updated" datetime="2026-03-24">24 March 2026</time></p>
    <details open>
     <summary>More details about this document</summary>
     <div data-fill-with="spec-metadata">
      <dl>
       <dt>This version:
-      <dd><a class="u-url" href="https://explainers-by-googlers.github.io/todo-your-repo-name">https://explainers-by-googlers.github.io/todo-your-repo-name</a>
+      <dd><a class="u-url" href="https://explainers-by-googlers.github.io/web-scanning">https://explainers-by-googlers.github.io/web-scanning</a>
       <dt>Issue Tracking:
-      <dd><a href="https://github.com/explainers-by-googlers/todo-your-repo-name/issues/">GitHub</a>
+      <dd><a href="https://github.com/explainers-by-googlers/web-scanning/issues/">GitHub</a>
       <dt class="editor">Editor:
-      <dd class="editor h-card p-author vcard"><a class="email fn p-name u-email" href="mailto:TODO@google.com">TODO: Your Name</a> (<a class="org p-org" href="https://google.com">Google</a>)
+      <dd class="editor h-card p-author vcard"><a class="email fn p-name u-email" href="mailto:zgroza@google.com">Zgroza Klimek</a> (<a class="org p-org" href="https://google.com">Google</a>)
      </dl>
     </div>
    </details>
    <div data-fill-with="warning"></div>
-   <p class="copyright" data-fill-with="copyright"><a href="https://www.w3.org/policies/#copyright">Copyright</a> © 2025 <a href="https://www.w3.org/">World Wide Web Consortium</a>. <abbr title="World Wide Web Consortium">W3C</abbr><sup>®</sup> <a href="https://www.w3.org/policies/#Legal_Disclaimer">liability</a>, <a href="https://www.w3.org/policies/#W3C_Trademarks">trademark</a> and <a href="https://www.w3.org/copyright/software-license/" rel="license" title="W3C Software and Document License">permissive document license</a> rules apply.
+   <p class="copyright" data-fill-with="copyright"><a href="https://www.w3.org/policies/#copyright">Copyright</a> © 2026 <a href="https://www.w3.org/">World Wide Web Consortium</a>. <abbr title="World Wide Web Consortium">W3C</abbr><sup>®</sup> <a href="https://www.w3.org/policies/#Legal_Disclaimer">liability</a>, <a href="https://www.w3.org/policies/#W3C_Trademarks">trademark</a> and <a href="https://www.w3.org/copyright/software-license/" rel="license" title="W3C Software and Document License">permissive document license</a> rules apply.
 </p>
    <hr title="Separator for header">
   </div>
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="heading no-num no-ref no-toc settled" id="abstract"><span class="content">Abstract</span></h2>
-   <p>TODO: A short description of your spec, one or two sentences.</p>
+   <p>This specification defines a web-native API for document scanning, allowing web applications to securely interact with attached or networked scanning hardware.</p>
   </div>
   <h2 class="heading no-num no-ref no-toc settled" id="sotd"><span class="content">Status of this document</span></h2>
   <div data-fill-with="status">
@@ -584,7 +584,7 @@ dd:not(:last-child) > .wpt-tests-block:not([open]):last-child {
   <div data-fill-with="at-risk"></div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-ref no-toc" id="contents">Table of Contents</h2>
-   <ol class="toc" role="directory">
+   <ol class="toc">
     <li><a href="#intro"><span class="secno">1</span> <span class="content">Introduction</span></a>
     <li>
      <a href="#w3c-conformance"><span class="secno"></span> <span class="content">Conformance</span></a>
@@ -600,7 +600,7 @@ dd:not(:last-child) > .wpt-tests-block:not([open]):last-child {
   </nav>
   <main>
    <h2 class="heading settled" data-level="1" id="intro"><span class="secno">1. </span><span class="content">Introduction</span><a class="self-link" href="#intro"></a></h2>
-   <p>For now, see the <a href="https://github.com/explainers-by-googlers/todo-your-repo-name">explainer</a>.</p>
+   <p>For now, see the <a href="https://github.com/explainers-by-googlers/web-scanning">explainer</a>.</p>
    <p>See <a href="https://garykac.github.io/procspec/">https://garykac.github.io/procspec/</a>,
 <a href="https://dlaliberte.github.io/bikeshed-intro/index.html">https://dlaliberte.github.io/bikeshed-intro/index.html</a>,
 and <a href="https://speced.github.io/bikeshed/">https://speced.github.io/bikeshed/</a> to get started on your
