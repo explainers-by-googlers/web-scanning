@@ -1,13 +1,11 @@
-# Explainer for the Web Scanning API
-
 This proposal is an early design sketch by the ChromeOS team to describe the problem of document scanning on the web and solicit feedback on the proposed solution. It has not been approved to ship in Chrome.
 
-## Proponents
+# Web Scanning API Explainer
 
-- Google Chrome
+This proposal describes a web-native API for document scanning. It aims to provide a standardized, secure, and user-friendly way for web applications to interact with scanning hardware, such as flatbed scanners and automatic document feeders (ADF).
 
 ## Participate
-- https://github.com/explainers-by-googlers/web-scanning/issues
+- **Discussion:** [Issue tracker on GitHub](https://github.com/explainers-by-googlers/web-scanning/issues)
 
 ## Table of Contents
 
@@ -22,7 +20,7 @@ This proposal is an early design sketch by the ChromeOS team to describe the pro
 - [Use cases](#use-cases)
   - [Single-page flatbed scanning](#single-page-flatbed-scanning)
   - [High-volume batch scanning (ADF)](#high-volume-batch-scanning-adf)
-  - [Progressive image display](#progressive-image-display)
+  - [Progressive image display and processing](#progressive-image-display-and-processing)
 - [Potential Solution](#potential-solution)
   - [The `ScannerManager` Interface](#the-scannermanager-interface)
   - [The `Scanner` Interface](#the-scanner-interface)
@@ -33,26 +31,25 @@ This proposal is an early design sketch by the ChromeOS team to describe the pro
 - [Detailed design discussion](#detailed-design-discussion)
   - [User-Mediated Device Selection (The Chooser Pattern)](#user-mediated-device-selection-the-chooser-pattern)
   - [Streaming vs. Atomic Results](#streaming-vs-atomic-results)
+  - [State Management and Error Recovery](#state-management-and-error-recovery)
+  - [Advanced On-the-fly Processing](#advanced-on-the-fly-processing)
   - [Normalized Coordinate Geometry](#normalized-coordinate-geometry)
 - [Considered alternatives](#considered-alternatives)
   - [Direct Hardware Access (WebUSB/WebBluetooth)](#direct-hardware-access-webusbwebbluetooth)
   - [Extension-based APIs](#extension-based-apis)
 - [Security and Privacy Considerations](#security-and-privacy-considerations)
 - [Stakeholder Feedback / Opposition](#stakeholder-feedback--opposition)
+- [References & Acknowledgements](#references--acknowledgements)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Introduction
 
-Web applications requiring document scanning currently rely on fragmented, non-standard approaches, such as proprietary browser extensions or legacy app models (e.g., Chrome Apps using the [`chrome.documentScan`](https://developer.chrome.com/docs/extensions/reference/api/documentScan) API). These legacy models tightly couple web applications to specific browser ecosystems or require users to install heavy, OS-specific native companion applications. These methods severely limit cross-browser compatibility, create maintenance burdens for developers, and pose security risks as browser vendors transition away from extension-bound hardware access (such as the shift to Manifest V3).
+Imagine a user trying to upload a signed medical release form to a patient portal, or a small business owner scanning a stack of invoices into an accounting web app. Today, these users must often leave the browser, find an OS-specific scanning application, save the file to their local disk, and then return to the web app to upload it. Alternatively, they might be forced to install proprietary browser extensions or "bridge" software that creates a maintenance burden and security risks.
 
-The Web Scanning API provides a standardized, secure, and web-native interface for document scanning. It abstracts underlying, highly varied hardware protocols into a cohesive API. These protocols include:
-- **TWAIN / TWAIN Direct:** A legacy driver-based standard and its modern RESTful network successor.
-- **eSCL (AirScan):** A driverless, network-based scanning protocol developed by the Mopria Alliance.
-- **SANE (Scanner Access Now Easy):** A standardized API predominantly used in UNIX/Linux environments.
-- **WSD (Web Services for Devices):** Microsoft's native architecture for network-connected devices.
+The **Web Scanning API** solves this by providing a secure, web-native interface for document scanning. It abstracts underlying protocols—including TWAIN, eSCL (AirScan), SANE, and WSD—into a cohesive JavaScript API. This allows developers to build seamless imaging workflows that work across different hardware and operating systems without needing to understand the intricacies of low-level transport protocols.
 
-By abstracting these protocols, the API ensures that web applications can interact with scanning hardware through a uniform, user-mediated permission model without needing to understand the underlying transport.
+By leveraging a user-mediated permission model (similar to WebUSB or WebBluetooth), the API ensures that hardware access is strictly controlled by the user, protecting privacy while enabling powerful new capabilities for the web.
 
 ## Terminology
 
@@ -62,6 +59,8 @@ To help developers without background in imaging hardware, we define the followi
 - **Duplex Scanning:** The ability to scan both sides of a piece of paper automatically.
 - **Resolution (DPI):** Measured in Dots Per Inch. Higher DPI means more detail but larger file sizes and slower scan speeds.
 - **Color Mode:** Options typically include `color` (24-bit), `grayscale` (8-bit), and `monochrome` (1-bit black and white).
+- **eSCL (AirScan):** A modern, driverless, network-based scanning protocol that uses HTTP and XML.
+- **TWAIN Direct:** A modern, driverless successor to the TWAIN standard that uses JSON "ScanTickets" for job configuration.
 - **Paper Jam:** A mechanical error where paper becomes stuck inside the ADF mechanism.
 
 ## Goals
@@ -83,10 +82,10 @@ To help developers without background in imaging hardware, we define the followi
 A user needs to scan a single document (e.g., a signed contract) from a flatbed scanner into a web-based document management system.
 
 ### High-volume batch scanning (ADF)
-A user needs to scan a stack of documents using an Automatic Document Feeder (ADF), potentially with duplex (two-sided) scanning, into a medical or enterprise record system.
+An enterprise user (e.g., in a medical or legal office) needs to scan a large stack of documents using an ADF, potentially with duplex (two-sided) scanning enabled, directly into a record-keeping system.
 
-### Progressive image display
-A user scans a high-resolution photo. To ensure the UI feels responsive, the application displays chunks of the image as they are received from the scanner, rather than waiting for the entire multi-megabyte file to finish.
+### Progressive image display and processing
+A user scans a high-resolution photo. To ensure the UI feels responsive, the application displays chunks of the image as they are received. For high-volume workflows, the application can start uploading the first page while the second page is still being mechanically processed.
 
 ## Potential Solution
 
@@ -179,6 +178,16 @@ To prevent fingerprinting and unauthorized hardware access, the API mandates a b
 ### Streaming vs. Atomic Results
 Scanning a single A4 page at 600 DPI can produce over 100MB of raw data. Returning this as a single atomic `Blob` can lead to out-of-memory crashes, especially on mobile devices or low-end hardware. The `ScanJob` interface uses `ReadableStream` and `AsyncIterable` to allow developers to process data as it arrives, enabling progressive rendering and efficient uploads.
 
+### State Management and Error Recovery
+Scanning is a mechanical process. Scanners can be *Busy*, *Offline*, or in an *Error* state (e.g., Paper Jam, Cover Open). The `ScanJob` interface provides event handlers and state properties to allow applications to react to these conditions and guide the user through physical troubleshooting.
+
+### Advanced On-the-fly Processing
+Modern scanners often support hardware-level processing to reduce bandwidth and post-processing requirements. The API proposal includes support for:
+- **Automatic Blank Page Detection:** Skipping empty pages in a batch.
+- **Auto-rotation:** Correcting the orientation of scanned pages.
+- **Auto-cropping:** Detecting the boundaries of the document on the platen.
+- **Metadata Embedding:** Support for archival formats like **PDF/A** or providing cryptographic provenance via **C2PA signatures**.
+
 ### Normalized Coordinate Geometry
 Different scanning protocols use different units (e.g., eSCL uses 1/300ths of an inch). The Web Scanning API normalizes all spatial dimensions to **millimeters** (physical) or **CSS pixels** (logical), ensuring a consistent developer experience across all hardware.
 
@@ -201,7 +210,12 @@ Legacy APIs like `chrome.documentScan` are restricted to specific browser enviro
 ## Stakeholder Feedback / Opposition
 
 - **Google (Chrome):** Positive, driving the proposal.
-- **TWAIN Working Group:** Potentially positive, as their TWAIN Direct standard is explicitly designed to enable scanners to communicate directly with web applications ([TWAIN Direct:™ Easy Scanning for Every Application](https://www.info-source.com/twain-direct-easy-scanning-for-every-application/)).
-- **Mopria Alliance (eSCL):** Potentially positive, as the proposed API leverages their vendor-neutral driverless standard ([Mopria eSCL Specification Download](https://mopria.org/spec-download)).
+- **TWAIN Working Group:** Potentially positive, as their TWAIN Direct standard is explicitly designed to enable scanners to communicate directly with web applications.
+- **Mopria Alliance (eSCL):** Potentially positive, as the proposed API leverages their vendor-neutral driverless standard.
 
+## References & Acknowledgements
+
+- [eSCL (AirScan) Specification](https://mopria.org/spec-download)
+- [TWAIN Direct Specification](https://www.twaindirect.org/)
+- [SANE (Scanner Access Now Easy)](http://www.sane-project.org/)
 
