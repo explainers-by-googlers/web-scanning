@@ -32,7 +32,8 @@ This proposal describes a web-native API for document scanning. It aims to provi
   - [User-Mediated Device Selection (The Chooser Pattern)](#user-mediated-device-selection-the-chooser-pattern)
   - [Streaming vs. Atomic Results](#streaming-vs-atomic-results)
   - [State Management and Error Recovery](#state-management-and-error-recovery)
-  - [Advanced On-the-fly Processing](#advanced-on-the-fly-processing)
+  - [Standardized Options and Protocol Mapping](#standardized-options-and-protocol-mapping)
+  - [Advanced Capabilities and Future Work](#advanced-capabilities-and-future-work)
   - [Normalized Coordinate Geometry](#normalized-coordinate-geometry)
 - [Considered alternatives](#considered-alternatives)
   - [Direct Hardware Access (WebUSB/WebBluetooth)](#direct-hardware-access-webusbwebbluetooth)
@@ -179,14 +180,16 @@ To prevent fingerprinting and unauthorized hardware access, the API mandates a b
 Scanning a single A4 page at 600 DPI can produce over 100MB of raw data. Returning this as a single atomic `Blob` can lead to out-of-memory crashes, especially on mobile devices or low-end hardware. The `ScanJob` interface uses `ReadableStream` and `AsyncIterable` to allow developers to process data as it arrives, enabling progressive rendering and efficient uploads.
 
 ### State Management and Error Recovery
-Scanning is a mechanical process. Scanners can be *Busy*, *Offline*, or in an *Error* state (e.g., Paper Jam, Cover Open). The `ScanJob` interface provides event handlers and state properties to allow applications to react to these conditions and guide the user through physical troubleshooting.
+Scanning is a mechanical process. Scanners can be *Busy*, *Offline*, or in an *Error* state (e.g., Paper Jam, Cover Open). The `ScanJob` interface provides event handlers and state properties to allow applications to react to these conditions and guide the user through physical troubleshooting. For consistency, the API maps protocol-specific status codes (e.g., from eSCL's `/ScannerStatus`) to a standardized set of `ScanError` types.
 
-### Advanced On-the-fly Processing
-Modern scanners often support hardware-level processing to reduce bandwidth and post-processing requirements. The API proposal includes support for:
+### Standardized Options and Protocol Mapping
+To ensure a consistent developer experience across different hardware, the API defines a high-level set of scan options (e.g., `colorMode`, `source`) that browsers map to underlying protocol-specific settings (such as SANE options or eSCL XML elements). This abstraction prevents vendor-specific fragmentation while still allowing for the most common professional workflows.
+
+### Advanced Capabilities and Future Work
+Modern scanners often support advanced hardware-level processing. While the initial version of the API focuses on core imaging (PNG/JPEG output), future extensions may include:
 - **Automatic Blank Page Detection:** Skipping empty pages in a batch.
-- **Auto-rotation:** Correcting the orientation of scanned pages.
-- **Auto-cropping:** Detecting the boundaries of the document on the platen.
-- **Metadata Embedding:** Support for archival formats like **PDF/A** or providing cryptographic provenance via **C2PA signatures**.
+- **Auto-rotation and Auto-cropping:** Correcting page orientation and detecting document boundaries.
+- **Archival and Security Formats:** Support for **PDF/A** (archival fidelity) and cryptographic provenance via **C2PA signatures**. These features currently require significant new development in underlying platform layers (like `lorgnette` on ChromeOS) and are deferred to later versions of the specification.
 
 ### Normalized Coordinate Geometry
 Different scanning protocols use different units (e.g., eSCL uses 1/300ths of an inch). The Web Scanning API normalizes all spatial dimensions to **millimeters** (physical) or **CSS pixels** (logical), ensuring a consistent developer experience across all hardware.
